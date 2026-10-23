@@ -38,6 +38,7 @@
     .partial{background:#fff6dc;color:#9a741e}.unpaid{background:#ffecef;color:var(--red)}
     .hidden{display:none!important}.muted{color:var(--muted);font-size:12px}.notice{background:#fff8df;padding:10px;border-radius:10px;font-size:12px}
     .actions{display:flex;gap:8px;flex-wrap:wrap}.right{text-align:right}.empty{text-align:center;padding:30px;color:var(--muted)}
+    .auth-shell{min-height:calc(100vh - 160px);display:grid;place-items:center;padding:24px}.auth-card{max-width:440px;width:100%}
     @media(max-width:800px){.grid,.grid3{grid-template-columns:1fr 1fr}.summary{grid-template-columns:1fr}.item-row{grid-template-columns:1fr 80px 100px auto}}
     @media(max-width:520px){.grid,.grid3{grid-template-columns:1fr}.brand{display:block}.right{margin-top:10px}}
     @media print{
@@ -57,11 +58,24 @@
     </div>
     <div class="right no-print">
       <div id="firebaseStatus" class="muted">Firebase: not configured</div>
+      <button id="logoutBtn" class="danger hidden" onclick="logoutUser()" style="margin-top:8px">Logout</button>
     </div>
   </div>
 </header>
 
-<div class="container">
+<div id="loginScreen" class="auth-shell no-print">
+  <div class="card auth-card">
+    <h2 class="section-title" style="text-align:center">Mingsha Luxe POS Login</h2>
+    <div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="admin@mingshaluxe.com"></div>
+    <div class="field"><label>Password</label><input id="loginPassword" type="password" placeholder="Enter password"></div>
+    <div class="actions" style="margin-top:16px">
+      <button class="primary" style="width:100%" onclick="loginWithFirebase()">Login</button>
+    </div>
+    <p id="authMessage" class="muted" style="margin-top:12px">Login with your Firebase Auth account to access the POS dashboard.</p>
+  </div>
+</div>
+
+<div id="appShell" class="container hidden">
   <div class="tabs no-print">
     <button class="primary" onclick="showTab('pos')">POS / New Transaction</button>
     <button onclick="showTab('history')">Transaction History</button>
@@ -222,11 +236,13 @@
     </div>
   </section>
 </div>
+</div>
 
 <!-- Firebase modular SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -242,7 +258,7 @@
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
 
-  window.FirebaseAPI = { initializeApp, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc, app, analytics };
+  window.FirebaseAPI = { initializeApp, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc, getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, app, analytics };
   window.dispatchEvent(new Event("firebase-sdk-ready"));
 </script>
 
@@ -353,6 +369,8 @@ const FEE_OPTIONS = [
 let prices = { ...DEFAULT_PRICES };
 let transactions = [];
 let firebaseDB = null;
+let firebaseAuth = null;
+let currentUser = null;
 
 const peso = n => "₱" + Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
 const id = x => document.getElementById(x);
@@ -506,7 +524,52 @@ function calculate(){
   return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,total,paid,balance};
 }
 
+async function loginWithFirebase(){
+  const email = (id("loginEmail").value || "").trim();
+  const password = id("loginPassword").value || "";
+  const message = id("authMessage");
+
+  if(!email || !password){ message.textContent = "Please enter both email and password."; return; }
+  if(!firebaseAuth){ message.textContent = "Firebase authentication is not ready yet."; return; }
+
+  try{
+    message.textContent = "Signing in...";
+    const { signInWithEmailAndPassword } = window.FirebaseAPI;
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
+    message.textContent = "Login successful.";
+    id("loginPassword").value = "";
+  }catch(err){
+    message.textContent = "Login failed: " + (err.message || "Unknown error");
+  }
+}
+
+async function logoutUser(){
+  if(!firebaseAuth){ return; }
+  try{
+    const { signOut } = window.FirebaseAPI;
+    await signOut(firebaseAuth);
+  }catch(err){
+    console.error(err);
+    alert("Logout failed: " + err.message);
+  }
+}
+
+function syncAuthUI(user){
+  currentUser = user;
+  const loggedIn = !!user;
+  id("loginScreen").classList.toggle("hidden", loggedIn);
+  id("appShell").classList.toggle("hidden", !loggedIn);
+  id("logoutBtn").classList.toggle("hidden", !loggedIn);
+
+  if(loggedIn){
+    id("firebaseStatus").textContent = "Signed in: " + user.email;
+  }else{
+    id("firebaseStatus").textContent = "Firebase: not signed in";
+  }
+}
+
 async function saveTransaction(){
+  if(!currentUser){ alert("Please login first to save transactions."); return; }
   const c=calculate();
   const status=id("paymentStatus").value;
   const amountPaid=c.paid;
@@ -650,6 +713,7 @@ function renderPriceSettings(){
   `).join("");
 }
 function savePrices(){
+  if(!currentUser){ alert("Please login first to update prices."); return; }
   document.querySelectorAll(".priceInput").forEach(x=>prices[x.dataset.name]=+x.value||0);
   if(firebaseDB){
     const {doc,setDoc}=window.FirebaseAPI;
@@ -665,11 +729,25 @@ function savePrices(){
 async function connectFirebase(){
   try{
     const cfg=JSON.parse(id("firebaseConfig").value);
-    const {initializeApp,getFirestore}=window.FirebaseAPI;
+    const {initializeApp,getFirestore,getAuth,onAuthStateChanged}=window.FirebaseAPI;
     const app=initializeApp(cfg);
     firebaseDB=getFirestore(app);
+    firebaseAuth=getAuth(app);
     id("firebaseStatus").textContent="Firebase: connected";
     id("firebaseMessage").textContent="Connected successfully.";
+
+    onAuthStateChanged(firebaseAuth, (user) => {
+      syncAuthUI(user);
+      if(user){
+        loadAppSettings();
+        loadFirebaseTransactions();
+      } else {
+        transactions=[];
+        renderHistory();
+        renderReport();
+      }
+    });
+
     await loadAppSettings();
     await loadFirebaseTransactions();
   }catch(e){
