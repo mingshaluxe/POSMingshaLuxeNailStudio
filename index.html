@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mingsha Luxe Nail Studio — POS</title>
+  <style>
+    :root{
+      --pink:#f7b6d2; --pink2:#fff0f7; --lilac:#c9b6e8; --blue:#bfe5f5;
+      --gold:#b99645; --ink:#3e3340; --muted:#806f7d; --white:#fff;
+      --green:#4d9b72; --red:#c75b6d; --yellow:#c99a32; --line:#eadde7;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(135deg,#fff8fc,#f6f0ff 55%,#eefaff);
+      color:var(--ink);font-family:Arial,sans-serif}
+    header{background:linear-gradient(135deg,var(--pink2),#eee6ff,var(--blue));
+      padding:22px 16px;border-bottom:1px solid var(--line)}
+    .brand{max-width:1200px;margin:auto;display:flex;justify-content:space-between;gap:15px;align-items:center}
+    h1{font-family:Georgia,serif;margin:0;color:#6f5270;font-size:28px}
+    .tag{color:var(--muted);margin-top:5px}.container{max-width:1200px;margin:20px auto;padding:0 14px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+    button,.btn{border:0;border-radius:12px;padding:11px 15px;background:#fff;box-shadow:0 2px 10px #0000000b;
+      cursor:pointer;color:var(--ink);font-weight:700}
+    button:hover{transform:translateY(-1px)} .primary{background:linear-gradient(135deg,#e99fc3,#bda6df);color:white}
+    .danger{background:#fff0f2;color:var(--red)} .success{background:#edf9f2;color:var(--green)}
+    .card{background:#ffffffd9;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;
+      box-shadow:0 8px 30px #7d567c10}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .full{grid-column:1/-1}.field label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+    input,select,textarea{width:100%;padding:11px;border:1px solid #dfd2dc;border-radius:10px;background:white;color:var(--ink)}
+    textarea{min-height:80px;resize:vertical}.section-title{font-family:Georgia,serif;color:#75556e;margin:0 0 12px}
+    table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:13px}th{background:#fff0f7}
+    .item-row{display:grid;grid-template-columns:2fr .7fr .9fr auto;gap:8px;align-items:center;margin-bottom:8px}
+    .summary{display:grid;grid-template-columns:1fr 320px;gap:20px}.totals div{display:flex;justify-content:space-between;padding:6px 0}
+    .grand{font-size:20px;font-weight:800;border-top:2px solid var(--line);margin-top:6px;padding-top:12px}
+    .badge{padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800}.paid{background:#e8f7ef;color:var(--green)}
+    .partial{background:#fff6dc;color:#9a741e}.unpaid{background:#ffecef;color:var(--red)}
+    .hidden{display:none!important}.muted{color:var(--muted);font-size:12px}.notice{background:#fff8df;padding:10px;border-radius:10px;font-size:12px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}.right{text-align:right}.empty{text-align:center;padding:30px;color:var(--muted)}
+    @media(max-width:800px){.grid,.grid3{grid-template-columns:1fr 1fr}.summary{grid-template-columns:1fr}.item-row{grid-template-columns:1fr 80px 100px auto}}
+    @media(max-width:520px){.grid,.grid3{grid-template-columns:1fr}.brand{display:block}.right{margin-top:10px}}
+    @media print{
+      body{background:white}.no-print,header .actions,.tabs{display:none!important}.container{margin:0;max-width:none}
+      .card{box-shadow:none;border:0}.print-only{display:block!important}
+    }
+    .print-only{display:none}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div>
+      <h1>Mingsha Luxe Nail Studio</h1>
+      <div class="tag">Olongapo | The Home of Soft Glam</div>
+      <div class="muted">Barretto, Olongapo City · 09318833614</div>
+    </div>
+    <div class="right no-print">
+      <div id="firebaseStatus" class="muted">Firebase: not configured</div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs no-print">
+    <button class="primary" onclick="showTab('pos')">POS / New Transaction</button>
+    <button onclick="showTab('history')">Transaction History</button>
+    <button onclick="showTab('reports')">Sales Report</button>
+    <button onclick="showTab('settings')">Settings</button>
+  </div>
+
+  <!-- POS -->
+  <section id="posTab">
+    <div class="card">
+      <h2 class="section-title">Client & Transaction</h2>
+      <div class="grid">
+        <div class="field"><label>Receipt / Transaction No.</label><input id="txNo" readonly></div>
+        <div class="field"><label>Transaction Date</label><input id="txDate" type="datetime-local"></div>
+        <div class="field"><label>Client Name</label><input id="clientName" placeholder="Client name"></div>
+        <div class="field"><label>Contact Number</label><input id="clientPhone" placeholder="09xxxxxxxxx"></div>
+        <div class="field"><label>Appointment Date</label><input id="appointmentDate" type="date"></div>
+        <div class="field"><label>Transaction Type</label>
+          <select id="txType"><option>Payment Receipt</option><option>Quotation</option><option>Reservation</option></select>
+        </div>
+        <div class="field"><label>Payment Method</label>
+          <select id="paymentMethod"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option><option>Other</option></select>
+        </div>
+        <div class="field"><label>Payment Status</label>
+          <select id="paymentStatus"><option>PAID</option><option>PARTIAL</option><option>UNPAID</option><option>CANCELLED</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Services</h2>
+      <div id="serviceRows"></div>
+      <button onclick="addService()">+ Add Service</button>
+      <div class="muted" style="margin-top:8px">You can change prices anytime in Settings.</div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Nail Art / Add-ons</h2>
+      <div id="addonRows"></div>
+      <button onclick="addAddon()">+ Add Nail Art / Add-on</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Rhinestone & Charms</h2>
+      <div id="rhinestoneRows"></div>
+      <button onclick="addRhinestone()">+ Add Rhinestone & Charms</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Removal</h2>
+      <div id="removalRows"></div>
+      <button onclick="addRemoval()">+ Add Removal</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Package</h2>
+      <div class="notice">Packages are manually entered. Enter the package price and, if applicable, the regular total to automatically show the client's savings.</div>
+      <div id="packageRows" style="margin-top:12px"></div>
+      <button onclick="addPackage()">+ Add Package</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Additional Fees</h2>
+      <div id="feeRows"></div>
+      <button onclick="addFee()">+ Add Fee</button>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Reservation & Payment</h2>
+      <div class="grid3">
+        <div class="field"><label>Reservation Fee Paid</label><input id="reservationFee" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
+        <div class="field"><label>Reservation Deduction</label><input id="reservationDeduction" type="number" readonly></div>
+        <div class="field"><label>Additional Discount</label><input id="discount" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
+        <div class="field"><label>Amount Paid Today</label><input id="amountPaid" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
+        <div class="field full"><label>Notes</label><textarea id="notes" placeholder="Optional notes"></textarea></div>
+      </div>
+    </div>
+
+    <div class="card summary">
+      <div>
+        <h2 class="section-title">Receipt Notes</h2>
+        <div class="notice">
+          Reservation fee is deductible from the nail service total only. Additional fees are not reduced by the reservation fee.
+        </div>
+        <p class="muted">Payment records marked PAID will be included in the sales report. PARTIAL and UNPAID transactions remain in history.</p>
+      </div>
+      <div class="totals">
+        <div><span>Services</span><b id="sumServices">₱0.00</b></div>
+        <div><span>Nail Art / Add-ons</span><b id="sumAddons">₱0.00</b></div>
+        <div><span>Removal</span><b id="sumRemoval">₱0.00</b></div>
+        <div><span>Packages</span><b id="sumPackages">₱0.00</b></div>
+        <div><span>Additional Fees</span><b id="sumFees">₱0.00</b></div>
+        <div><span>Discount</span><b id="sumDiscount">-₱0.00</b></div>
+        <div><span>Reservation Deduction</span><b id="sumReservation">-₱0.00</b></div>
+        <div class="grand"><span>TOTAL</span><b id="grandTotal">₱0.00</b></div>
+        <div><span>Paid</span><b id="sumPaid">₱0.00</b></div>
+        <div><span>Balance</span><b id="sumBalance">₱0.00</b></div>
+      </div>
+    </div>
+
+    <div class="actions no-print">
+      <button class="primary" onclick="saveTransaction()">Save Transaction</button>
+      <button onclick="printReceipt()">Print Receipt</button>
+      <button onclick="newTransaction()">Clear / New</button>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="historyTab" class="hidden">
+    <div class="card">
+      <h2 class="section-title">Transaction History</h2>
+      <div class="grid no-print">
+        <div class="field"><label>Search</label><input id="historySearch" oninput="renderHistory()" placeholder="Client or receipt number"></div>
+        <div class="field"><label>Status</label><select id="historyStatus" onchange="renderHistory()"><option>ALL</option><option>PAID</option><option>PARTIAL</option><option>UNPAID</option><option>CANCELLED</option></select></div>
+        <div class="field"><label>From</label><input id="historyFrom" type="date" onchange="renderHistory()"></div>
+        <div class="field"><label>To</label><input id="historyTo" type="date" onchange="renderHistory()"></div>
+      </div>
+      <div id="historyTable" style="overflow:auto;margin-top:15px"></div>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section id="reportsTab" class="hidden">
+    <div class="card">
+      <h2 class="section-title">Sales Report</h2>
+      <div class="grid3">
+        <div><b>Paid Transactions</b><h2 id="reportCount">0</h2></div>
+        <div><b>Paid Sales</b><h2 id="reportSales">₱0.00</h2></div>
+        <div><b>Reservation Fees</b><h2 id="reportReservations">₱0.00</h2></div>
+      </div>
+      <div id="reportTable" style="overflow:auto;margin-top:15px"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settingsTab" class="hidden">
+    <div class="card">
+      <h2 class="section-title">Firebase Setup</h2>
+      <p class="muted">Paste your Firebase Web App configuration below. This is safe to place in client-side code; secure your database with Firebase Authentication and Firestore Security Rules.</p>
+      <textarea id="firebaseConfig" rows="12" placeholder='{
+  "apiKey": "YOUR_API_KEY",
+  "authDomain": "YOUR_PROJECT.firebaseapp.com",
+  "projectId": "YOUR_PROJECT_ID",
+  "storageBucket": "YOUR_PROJECT.firebasestorage.app",
+  "messagingSenderId": "YOUR_SENDER_ID",
+  "appId": "YOUR_APP_ID"
+}'></textarea>
+      <div class="actions" style="margin-top:10px">
+        <button class="primary" onclick="connectFirebase()">Connect Firebase</button>
+      </div>
+      <p id="firebaseMessage" class="muted"></p>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Service Prices</h2>
+      <div id="priceSettings"></div>
+      <button class="primary" onclick="savePrices()">Save Prices</button>
+    </div>
+  </section>
+</div>
+
+<!-- Firebase modular SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBbCDjOvSLKnK58ju8skeEk7pm16nfU5sA",
+    authDomain: "mingshaluxepos.firebaseapp.com",
+    projectId: "mingshaluxepos",
+    storageBucket: "mingshaluxepos.firebasestorage.app",
+    messagingSenderId: "499361929301",
+    appId: "1:499361929301:web:f8895a642208ea7ba61cdc",
+    measurementId: "G-JVEDEFL5CD"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+
+  window.FirebaseAPI = { initializeApp, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc, app, analytics };
+  window.dispatchEvent(new Event("firebase-sdk-ready"));
+</script>
+
+<script>
+const SERVICE_GROUPS = [
+  { label: "Gel Manicure", services: ["Gel Mani XS","Gel Mani S","Gel Mani M","Gel Mani ML","Gel Mani L","Gel Mani XL","Gel Mani XXL"] },
+  { label: "Softgel Extension", services: ["GelX XS","GelX S","GelX M","GelX ML","GelX L","GelX XL","GelX XXL"] },
+  { label: "Hardgel Overlay", services: ["HardgelOverlay XS","HardgelOverlay S","HardgelOverlay M","HardgelOverlay ML","HardgelOverlay L","HardgelOverlay XL","HardgelOverlay XXL"] },
+  { label: "Hardgel Extension", services: ["HardgelX XS","HardgelX S","HardgelX M","HardgelX ML","HardgelX L","HardgelX XL","HardgelX XXL"] },
+  { label: "Gel Pedicure", services: ["Gel Pedicure"] }
+];
+
+const DEFAULT_PRICES = Object.fromEntries(SERVICE_GROUPS.flatMap(group => group.services.map(s => [s, ({
+  "Gel Mani XS":399,
+  "Gel Mani S":449,
+  "Gel Mani M":499,
+  "Gel Mani ML":549,
+  "Gel Mani L":599,
+  "Gel Mani XL":649,
+  "Gel Mani XXL":699,
+  "GelX XS":599,
+  "GelX S":649,
+  "GelX M":699,
+  "GelX ML":749,
+  "GelX L":799,
+  "GelX XL":849,
+  "GelX XXL":899,
+  "HardgelOverlay XS":699,
+  "HardgelOverlay S":749,
+  "HardgelOverlay M":799,
+  "HardgelOverlay ML":849,
+  "HardgelOverlay L":899,
+  "HardgelOverlay XL":949,
+  "HardgelOverlay XXL":999,
+  "HardgelX XS":799,
+  "HardgelX S":849,
+  "HardgelX M":899,
+  "HardgelX ML":949,
+  "HardgelX L":999,
+  "HardgelX XL":1049,
+  "HardgelX XXL":1099,
+  "Gel Pedicure":499
+}[s])])));
+
+const NAIL_ART_OPTIONS = [
+  { name: "3d Flower Partial", price: 39 },
+  { name: "3d flower detailed", price: 79 },
+  { name: "3d line / wooble", price: 29 },
+  { name: "3d Mermaid shell", price: 49 },
+  { name: "French tip", price: 29 },
+  { name: "Ombre", price: 29 },
+  { name: "Aura", price: 24 },
+  { name: "Chrome powder", price: 29 },
+  { name: "Chrome metalic", price: 19 },
+  { name: "Decals", price: 19 },
+  { name: "Handpaint easy", price: 39 },
+  { name: "Handpaint intricate", price: 49 },
+  { name: "Dots/lines", price: 19 },
+  { name: "Outline/shape", price: 24 },
+  { name: "Blooming/marble", price: 29 },
+  { name: "Loose glitter", price: 29 },
+  { name: "Paint glitter", price: 19 },
+  { name: "Encapsulation", price: 69 },
+  { name: "Embossed", price: 29 },
+  { name: "Cateye", price: 29 },
+  { name: "Tortoise", price: 39 }
+];
+
+const RHINESTONE_OPTIONS = [
+  { name: "Simple rhinestone 1-5pcs", price: 19 },
+  { name: "Intri rhinestone 6-10pcs", price: 29 },
+  { name: "Full nail rhinestone", price: 69 },
+  { name: "3/4", price: 59 },
+  { name: "1/2", price: 49 },
+  { name: "1/4", price: 39 },
+  { name: "1/8", price: 29 },
+  { name: "Charms small", price: 19 },
+  { name: "Charms med", price: 29 },
+  { name: "Charms large", price: 39 },
+  { name: "Metal charms small", price: 39 },
+  { name: "Metal charms med", price: 49 },
+  { name: "Metal charms large", price: 59 }
+];
+
+const REMOVAL_OPTIONS = [
+  { name: "Removal (our works)", price: 149 },
+  { name: "Removal regu mani (other nail tech)", price: 50 },
+  { name: "Gel mani removal (other nail tech)", price: 179 },
+  { name: "Gel pedi removal (other nail tech)", price: 199 },
+  { name: "Structure builder gel (other nail tech)", price: 249 },
+  { name: "Softgel extension (other nail tech)", price: 299 },
+  { name: "Hardgel overlay and extension (other nail tech)", price: 399 }
+];
+
+const FEE_OPTIONS = [
+  { name: "Cancellation fee", price: 250 },
+  { name: "Late fee", price: 0 },
+  { name: "5-10min late", price: 100 },
+  { name: "11-15mins late", price: 150 },
+  { name: "16-20 mins late", price: 200 },
+  { name: "21-29 mins late", price: 250 },
+  { name: "Last minutes booking (same day booking)", price: 200 },
+  { name: "Home service fee (1-3clients)", price: 500 },
+  { name: "Transportation fee", price: 0 },
+  { name: "Other fee", price: 0 }
+];
+
+let prices = { ...DEFAULT_PRICES };
+let transactions = [];
+let firebaseDB = null;
+
+const peso = n => "₱" + Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const id = x => document.getElementById(x);
+const nowLocal = () => {
+  const d=new Date(), pad=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+function makeNo(){ return "ML-" + new Date().toISOString().slice(0,10).replaceAll("-","") + "-" + String(Date.now()).slice(-5); }
+
+function showTab(tab){
+  ["pos","history","reports","settings"].forEach(x=>id(x+"Tab").classList.toggle("hidden",x!==tab));
+  if(tab==="history") renderHistory();
+  if(tab==="reports") renderReport();
+  if(tab==="settings") renderPriceSettings();
+}
+
+function newTransaction(){
+  id("txNo").value=makeNo(); id("txDate").value=nowLocal();
+  id("clientName").value=""; id("clientPhone").value=""; id("appointmentDate").value="";
+  id("txType").value="Payment Receipt"; id("paymentMethod").value="Cash"; id("paymentStatus").value="PAID";
+  id("reservationFee").value=0; id("discount").value=0; id("amountPaid").value=0; id("notes").value="";
+  ["serviceRows","addonRows","removalRows","packageRows","feeRows"].forEach(x=>id(x).innerHTML="");
+  addService(); calculate();
+}
+
+function getServiceGroups(){
+  const known = new Set(SERVICE_GROUPS.flatMap(group => group.services));
+  const grouped = SERVICE_GROUPS.map(group => ({
+    label: group.label,
+    services: group.services.filter(name => name in prices)
+  })).filter(group => group.services.length);
+  const uncategorized = Object.keys(prices).filter(name => !known.has(name));
+  if (uncategorized.length) grouped.push({ label: "Other Services", services: uncategorized });
+  return grouped;
+}
+function buildServiceOptions(selected=""){
+  const groups = getServiceGroups();
+  const html = [
+    `<option value="">Select service</option>`,
+    `<option value="__custom__" ${selected==="__custom__"?"selected":""}>Other (manual service)</option>`
+  ];
+  groups.forEach(group => {
+    html.push(`<optgroup label="${escapeHtml(group.label)}">${group.services.map(name => `<option value="${escapeHtml(name)}" data-price="${prices[name]}" ${name===selected?"selected":""}>${escapeHtml(name)}</option>`).join("")}</optgroup>`);
+  });
+  return html.join("");
+}
+function addService(name="",price=""){
+  const row=document.createElement("div"); row.className="item-row";
+  row.innerHTML=`<select class="serviceName" onchange="syncServicePrice(this)">
+      ${buildServiceOptions(name)}</select>
+    <input class="serviceQty" type="number" min="1" value="1" oninput="calculate()">
+    <input class="servicePrice" type="number" min="0" step=".01" value="${price||0}" oninput="calculate()">
+    <button class="danger" onclick="this.parentElement.remove();calculate()">×</button>`;
+  id("serviceRows").appendChild(row);
+  if(name) row.querySelector(".servicePrice").value=price||prices[name]||0;
+}
+function syncServicePrice(sel){
+  if(sel.value==="__custom__"){
+    const customName=prompt("Enter service name:", "Custom Service");
+    if(!customName || !customName.trim()){
+      sel.value=""; sel.parentElement.querySelector(".servicePrice").value=0; calculate(); return;
+    }
+    const trimmedName=customName.trim();
+    const customPrice=Number(prompt("Enter service price:", "0"));
+    if(Number.isNaN(customPrice) || customPrice < 0){
+      sel.value=""; sel.parentElement.querySelector(".servicePrice").value=0; calculate(); return;
+    }
+    prices[trimmedName]=customPrice;
+    sel.innerHTML=buildServiceOptions(trimmedName);
+    sel.value=trimmedName;
+    sel.parentElement.querySelector(".servicePrice").value=customPrice;
+    renderPriceSettings();
+    calculate();
+    return;
+  }
+  const o=sel.options[sel.selectedIndex];
+  sel.parentElement.querySelector(".servicePrice").value=o?.dataset.price||0; calculate();
+}
+
+function addAddon(){
+  addGeneric("addonRows","Nail Art", NAIL_ART_OPTIONS);
+}
+function addRhinestone(){
+  addGeneric("rhinestoneRows","Rhinestone & Charms", RHINESTONE_OPTIONS);
+}
+function addRemoval(){
+  addGeneric("removalRows","Removal", REMOVAL_OPTIONS);
+}
+function addFee(){
+  addGeneric("feeRows","Fee",FEE_OPTIONS);
+}
+function syncGenericPrice(sel){
+  const option=sel.options[sel.selectedIndex];
+  if(!option || !option.dataset.price) return;
+  sel.parentElement.querySelector(".genericPrice").value=option.dataset.price || 0;
+  calculate();
+}
+function addGeneric(container,placeholder,options=[]){
+  const row=document.createElement("div");row.className="item-row";
+  const isNamedOptions = options.length && typeof options[0] === "object" && options[0] && "name" in options[0];
+  const first = isNamedOptions
+    ? `<select class="genericName" onchange="syncGenericPrice(this)"><option value="">Select ${placeholder}</option>${options.map(x=>`<option value="${escapeHtml(x.name)}" data-price="${x.price}">${escapeHtml(x.name)}</option>`).join("")}</select>`
+    : (options.length ? `<select class="genericName"><option value="">Select ${placeholder}</option>${options.map(x=>`<option>${x}</option>`).join("")}</select>` : `<input class="genericName" placeholder="${placeholder}">`);
+  const startPrice = isNamedOptions ? (options[0]?.price || 0) : 0;
+  row.innerHTML=`${first}<input class="genericQty" type="number" min="1" value="1" oninput="calculate()">
+    <input class="genericPrice" type="number" min="0" step=".01" placeholder="Price" value="${startPrice}" oninput="calculate()">
+    <button class="danger" onclick="this.parentElement.remove();calculate()">×</button>`;
+  id(container).appendChild(row);
+}
+function addPackage(){
+  const row=document.createElement("div");row.className="item-row";
+  row.innerHTML=`<input class="packageName" placeholder="Package name">
+    <input class="packageRegular" type="number" min="0" placeholder="Regular total" value="0" oninput="calculate()">
+    <input class="packagePrice" type="number" min="0" placeholder="Package price" value="0" oninput="calculate()">
+    <button class="danger" onclick="this.parentElement.remove();calculate()">×</button>`;
+  id("packageRows").appendChild(row);
+}
+
+function rowsTotal(container,nameClass,priceClass,qtyClass){
+  return [...id(container).children].reduce((s,r)=>s+(Number(r.querySelector("."+priceClass)?.value)||0)*(Number(r.querySelector("."+qtyClass)?.value)||1),0);
+}
+function getData(){
+  const services=[...id("serviceRows").children].map(r=>({name:r.querySelector(".serviceName").value,qty:+r.querySelector(".serviceQty").value||1,price:+r.querySelector(".servicePrice").value||0})).filter(x=>x.name);
+  const addons=[...id("addonRows").children].map(r=>({name:r.querySelector(".genericName").value,qty:+r.querySelector(".genericQty").value||1,price:+r.querySelector(".genericPrice").value||0})).filter(x=>x.name);
+  const rhinestones=[...id("rhinestoneRows").children].map(r=>({name:r.querySelector(".genericName").value,qty:+r.querySelector(".genericQty").value||1,price:+r.querySelector(".genericPrice").value||0})).filter(x=>x.name);
+  const removals=[...id("removalRows").children].map(r=>({name:r.querySelector(".genericName").value,qty:+r.querySelector(".genericQty").value||1,price:+r.querySelector(".genericPrice").value||0})).filter(x=>x.name);
+  const packages=[...id("packageRows").children].map(r=>({name:r.querySelector(".packageName").value,regular:+r.querySelector(".packageRegular").value||0,price:+r.querySelector(".packagePrice").value||0})).filter(x=>x.name);
+  const fees=[...id("feeRows").children].map(r=>({name:r.querySelector(".genericName").value,qty:+r.querySelector(".genericQty").value||1,price:+r.querySelector(".genericPrice").value||0})).filter(x=>x.name);
+  return {services,addons,rhinestones,removals,packages,fees};
+}
+function calculate(){
+  const d=getData();
+  const services=d.services.reduce((s,x)=>s+x.price*x.qty,0);
+  const addons=d.addons.reduce((s,x)=>s+x.price*x.qty,0);
+  const rhinestones=d.rhinestones.reduce((s,x)=>s+x.price*x.qty,0);
+  const removal=d.removals.reduce((s,x)=>s+x.price*x.qty,0);
+  const packages=d.packages.reduce((s,x)=>s+x.price,0);
+  const fees=d.fees.reduce((s,x)=>s+x.price*x.qty,0);
+  const discount=+id("discount").value||0;
+  const reservation=+id("reservationFee").value||0;
+  const reservationDeduction=Math.min(reservation,services);
+  const total=Math.max(0,services+addons+rhinestones+removal+packages+fees-discount-reservationDeduction);
+  const paid=+id("amountPaid").value||0;
+  const balance=Math.max(0,total-paid);
+  id("reservationDeduction").value=reservationDeduction.toFixed(2);
+  id("sumServices").textContent=peso(services); id("sumAddons").textContent=peso(addons+rhinestones);
+  id("sumRemoval").textContent=peso(removal); id("sumPackages").textContent=peso(packages);
+  id("sumFees").textContent=peso(fees); id("sumDiscount").textContent="-"+peso(discount);
+  id("sumReservation").textContent="-"+peso(reservationDeduction); id("grandTotal").textContent=peso(total);
+  id("sumPaid").textContent=peso(paid); id("sumBalance").textContent=peso(balance);
+  return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,total,paid,balance};
+}
+
+async function saveTransaction(){
+  const c=calculate();
+  const status=id("paymentStatus").value;
+  const amountPaid=c.paid;
+  if(!id("clientName").value.trim()){alert("Please enter the client name.");return;}
+  if(status==="PAID" && amountPaid < c.total){ alert("PAID transactions must have the full amount paid."); return; }
+  if(status!=="PAID" && amountPaid>c.total){ alert("Amount paid cannot exceed the total."); return; }
+
+  const tx={
+    receiptNo:id("txNo").value, createdAt:new Date().toISOString(),
+    txDate:id("txDate").value, clientName:id("clientName").value.trim(), clientPhone:id("clientPhone").value.trim(),
+    appointmentDate:id("appointmentDate").value, txType:id("txType").value,
+    paymentMethod:id("paymentMethod").value, paymentStatus:status, notes:id("notes").value,
+    reservationFee:c.reservation, reservationDeduction:c.reservationDeduction,
+    discount:c.discount, amountPaid:c.paid, total:c.total, balance:c.balance,
+    services:c.d.services, addons:[...c.d.addons, ...c.d.rhinestones], removals:c.d.removals, packages:c.d.packages, fees:c.d.fees
+  };
+
+  if(firebaseDB){
+    try{
+      const {collection,addDoc}=window.FirebaseAPI;
+      await addDoc(collection(firebaseDB,"transactions"),tx);
+      transactions.unshift(tx);
+      renderHistory();renderReport();
+    }catch(e){
+      console.error(e);
+      alert("Firebase save failed: "+e.message);
+      return;
+    }
+  } else {
+    alert("Firebase is not connected.");
+    return;
+  }
+  alert("Transaction saved successfully.");
+  printReceipt();
+  newTransaction();
+}
+
+async function loadFirebaseTransactions(){
+  if(!firebaseDB)return;
+  try{
+    const {collection,getDocs,query,orderBy}=window.FirebaseAPI;
+    const snap=await getDocs(query(collection(firebaseDB,"transactions"),orderBy("createdAt","desc")));
+    transactions=snap.docs.map(d=>({firebaseId:d.id,...d.data()}));
+    renderHistory();renderReport();
+  }catch(e){console.error(e);id("firebaseStatus").textContent="Firebase connected (history load error)"; }
+}
+
+async function loadAppSettings(){
+  if(!firebaseDB)return;
+  try{
+    const {doc,getDoc}=window.FirebaseAPI;
+    const snap=await getDoc(doc(firebaseDB,"settings","prices"));
+    if(snap.exists()){
+      const saved = snap.data();
+      prices = { ...DEFAULT_PRICES, ...saved };
+      renderPriceSettings();
+    }
+  }catch(e){
+    console.error(e);
+  }
+}
+
+function renderHistory(){
+  const search=(id("historySearch").value||"").toLowerCase();
+  const status=id("historyStatus").value;
+  const from=id("historyFrom").value, to=id("historyTo").value;
+  let list=transactions.filter(t=>{
+    const match=!search || t.clientName.toLowerCase().includes(search)||t.receiptNo.toLowerCase().includes(search);
+    const st=status==="ALL"||t.paymentStatus===status;
+    const date=(t.txDate||"").slice(0,10);
+    const fr=!from||date>=from, tr=!to||date<=to;
+    return match&&st&&fr&&tr;
+  });
+  if(!list.length){id("historyTable").innerHTML='<div class="empty">No transactions found.</div>';return;}
+  id("historyTable").innerHTML=`<table><thead><tr>
+    <th>Receipt</th><th>Date</th><th>Client</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th>
+  </tr></thead><tbody>${list.map(t=>`<tr>
+    <td>${escapeHtml(t.receiptNo)}</td><td>${escapeHtml((t.txDate||"").replace("T"," "))}</td>
+    <td>${escapeHtml(t.clientName)}</td><td>${peso(t.total)}</td><td>${peso(t.amountPaid)}</td><td>${peso(t.balance)}</td>
+    <td><span class="badge ${t.paymentStatus.toLowerCase()}">${t.paymentStatus}</span></td>
+    <td><button onclick="viewTransaction('${t.receiptNo}')">View</button></td>
+  </tr>`).join("")}</tbody></table>`;
+}
+
+function renderReport(){
+  const paid=transactions.filter(t=>t.paymentStatus==="PAID");
+  const sales=paid.reduce((s,t)=>s+(+t.total||0),0);
+  const reservations=paid.reduce((s,t)=>s+(+t.reservationFee||0),0);
+  id("reportCount").textContent=paid.length;id("reportSales").textContent=peso(sales);id("reportReservations").textContent=peso(reservations);
+  id("reportTable").innerHTML=paid.length?`<table><thead><tr><th>Date</th><th>Receipt</th><th>Client</th><th>Total</th></tr></thead><tbody>${paid.map(t=>`<tr><td>${(t.txDate||"").slice(0,10)}</td><td>${escapeHtml(t.receiptNo)}</td><td>${escapeHtml(t.clientName)}</td><td>${peso(t.total)}</td></tr>`).join("")}</tbody></table>`:"<div class='empty'>No PAID transactions yet.</div>";
+}
+
+function viewTransaction(no){
+  const t=transactions.find(x=>x.receiptNo===no);if(!t)return;
+  alert(`Receipt ${t.receiptNo}\nClient: ${t.clientName}\nTotal: ${peso(t.total)}\nPaid: ${peso(t.amountPaid)}\nBalance: ${peso(t.balance)}`);
+}
+
+function printReceipt(){
+  const c=calculate(), d=c.d;
+  const lines=[];
+  d.services.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
+  d.addons.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
+  d.rhinestones.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)} (Rhinestone & Charms)</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
+  d.removals.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
+  d.packages.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)} (Package)</td><td>1</td><td>${peso(x.price)}</td></tr>`));
+  d.fees.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
+  const win=window.open("","_blank","width=800,height=900");
+  win.document.write(`<html><head><title>${id("txNo").value}</title><style>
+  body{font-family:Arial;margin:35px;color:#3e3340}h1{text-align:center;font-family:Georgia}.center{text-align:center}
+  table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+  .total{font-size:20px;font-weight:bold}.pink{background:#fff0f7;padding:12px;border-radius:10px}
+  </style></head><body>
+  <div class="center"><h1>Mingsha Luxe Nail Studio</h1><div>Olongapo | The Home of Soft Glam</div><div>Barretto, Olongapo City · 09318833614</div></div>
+  <hr><h2 class="center">${id("txType").value}</h2>
+  <div class="pink"><b>Receipt No:</b> ${id("txNo").value}<br><b>Client:</b> ${escapeHtml(id("clientName").value)}<br>
+  <b>Date:</b> ${escapeHtml(id("txDate").value)}<br><b>Appointment:</b> ${escapeHtml(id("appointmentDate").value||"—")}</div>
+  <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${lines.join("")}</tbody></table>
+  <table><tr><td>Discount</td><td>${peso(c.discount)}</td></tr><tr><td>Reservation Deduction</td><td>${peso(c.reservationDeduction)}</td></tr>
+  <tr class="total"><td>TOTAL</td><td>${peso(c.total)}</td></tr><tr><td>Amount Paid</td><td>${peso(c.paid)}</td></tr>
+  <tr class="total"><td>Balance</td><td>${peso(c.balance)}</td></tr></table>
+  <p><b>Status:</b> ${id("paymentStatus").value} &nbsp; <b>Payment:</b> ${id("paymentMethod").value}</p>
+  <p><b>Reservation Fee:</b> ${peso(c.reservation)} — deductible from nail service only.</p>
+  <p class="center">Thank you for choosing Mingsha Luxe Nail Studio, Mingsha Babe! ♡</p>
+  <script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
+}
+
+function renderPriceSettings(){
+  const groups = getServiceGroups();
+  id("priceSettings").innerHTML = groups.map(group => `
+    <div style="margin-bottom:16px; border:1px solid #eadde7; border-radius:12px; padding:12px; background:#fffafc;">
+      <h3 style="margin:0 0 10px; color:#75556e;">${escapeHtml(group.label)}</h3>
+      ${group.services.map(name => `
+        <div class="grid3" style="margin-bottom:8px">
+          <div><input value="${escapeHtml(name)}" disabled></div>
+          <div><input class="priceInput" data-name="${escapeHtml(name)}" type="number" value="${prices[name]}" min="0"></div>
+          <div></div>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+}
+function savePrices(){
+  document.querySelectorAll(".priceInput").forEach(x=>prices[x.dataset.name]=+x.value||0);
+  if(firebaseDB){
+    const {doc,setDoc}=window.FirebaseAPI;
+    setDoc(doc(firebaseDB,"settings","prices"), prices)
+      .then(()=>alert("Prices saved to Firebase."))
+      .catch(err=>alert("Could not save prices to Firebase: "+err.message));
+  } else {
+    alert("Firebase is not connected. Please connect Firebase first.");
+    return;
+  }
+  newTransaction();
+}
+async function connectFirebase(){
+  try{
+    const cfg=JSON.parse(id("firebaseConfig").value);
+    const {initializeApp,getFirestore}=window.FirebaseAPI;
+    const app=initializeApp(cfg);
+    firebaseDB=getFirestore(app);
+    id("firebaseStatus").textContent="Firebase: connected";
+    id("firebaseMessage").textContent="Connected successfully.";
+    await loadAppSettings();
+    await loadFirebaseTransactions();
+  }catch(e){
+    id("firebaseStatus").textContent="Firebase: connection failed";
+    id("firebaseMessage").textContent="Error: "+e.message;
+  }
+}
+function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+
+window.addEventListener("firebase-sdk-ready",()=>{
+  const defaultConfig = {
+    apiKey: "AIzaSyBbCDjOvSLKnK58ju8skeEk7pm16nfU5sA",
+    authDomain: "mingshaluxepos.firebaseapp.com",
+    projectId: "mingshaluxepos",
+    storageBucket: "mingshaluxepos.firebasestorage.app",
+    messagingSenderId: "499361929301",
+    appId: "1:499361929301:web:f8895a642208ea7ba61cdc",
+    measurementId: "G-JVEDEFL5CD"
+  };
+  id("firebaseConfig").value = JSON.stringify(defaultConfig, null, 2);
+  connectFirebase();
+});
+window.addEventListener("load",()=>{newTransaction();renderPriceSettings();});
+</script>
+</body>
+</html>
