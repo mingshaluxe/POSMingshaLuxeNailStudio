@@ -16,6 +16,15 @@
     header{background:linear-gradient(135deg,var(--pink2),#eee6ff,var(--blue));
       padding:22px 16px;border-bottom:1px solid var(--line)}
     .brand{max-width:1200px;margin:auto;display:flex;justify-content:space-between;gap:15px;align-items:center}
+    .brand-left{display:flex;align-items:center;gap:14px;justify-content:flex-start}
+    .brand-copy{display:flex;flex-direction:column;align-items:flex-start}
+    .logo-mark{width:62px;height:62px;border-radius:18px;display:grid;place-items:center;
+      background:linear-gradient(135deg,#f7dceb,#e7d9ff 45%,#dceeff);border:2px solid rgba(124,97,126,.2);
+      box-shadow:0 8px 20px rgba(128,111,125,.18);overflow:hidden;padding:0;flex-shrink:0}
+    .logo-mark img{width:100%;height:100%;object-fit:cover;display:block}
+    .receipt-logo{width:96px;height:96px;border-radius:20px;display:block;object-fit:cover;border:2px solid rgba(124,97,126,.18);background:#fff;flex-shrink:0}
+    .receipt-brand{display:flex;align-items:center;justify-content:flex-start;gap:14px;text-align:left}
+    .receipt-brand .receipt-copy{text-align:left}
     h1{font-family:Georgia,serif;margin:0;color:#6f5270;font-size:28px}
     .tag{color:var(--muted);margin-top:5px}.container{max-width:1200px;margin:20px auto;padding:0 14px}
     .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -51,10 +60,15 @@
 <body>
 <header>
   <div class="brand">
-    <div>
-      <h1>Mingsha Luxe Nail Studio</h1>
-      <div class="tag">Olongapo | The Home of Soft Glam</div>
-      <div class="muted">Barretto, Olongapo City · 09318833614</div>
+    <div class="brand-left">
+      <div class="logo-mark" aria-label="Mingsha Luxe logo">
+        <img src="mingshalogo.jpg" alt="Mingsha Luxe logo">
+      </div>
+      <div class="brand-copy">
+        <h1>Mingsha Luxe Nail Studio</h1>
+        <div class="tag">Olongapo | The Home of Soft Glam</div>
+        <div class="muted">Barretto, Olongapo City · 09318833614</div>
+      </div>
     </div>
     <div class="right no-print">
       <div id="firebaseStatus" class="muted">Firebase: not configured</div>
@@ -149,6 +163,7 @@
         <div class="field"><label>Reservation Fee Paid</label><input id="reservationFee" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
         <div class="field"><label>Reservation Deduction</label><input id="reservationDeduction" type="number" readonly></div>
         <div class="field"><label>Additional Discount</label><input id="discount" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
+        <div class="field"><label><input id="taxEnabled" type="checkbox" checked onchange="calculate()"> Apply 8% Tax</label></div>
         <div class="field"><label>Amount Paid Today</label><input id="amountPaid" type="number" min="0" step=".01" value="0" oninput="calculate()"></div>
         <div class="field full"><label>Notes</label><textarea id="notes" placeholder="Optional notes"></textarea></div>
       </div>
@@ -572,7 +587,8 @@ function calculate(){
   const reservation=+id("reservationFee").value||0;
   const reservationDeduction=Math.min(reservation,services);
   const subtotalBeforeTax = Math.max(0, services + addons + rhinestones + removal + packages + fees - discount - reservationDeduction);
-  const tax = subtotalBeforeTax * 0.08;
+  const taxEnabled = !!(id("taxEnabled") && id("taxEnabled").checked);
+  const tax = taxEnabled ? subtotalBeforeTax * 0.08 : 0;
   const total = subtotalBeforeTax + tax;
   const paid=+id("amountPaid").value||0;
   const balance=Math.max(0,total-paid);
@@ -583,7 +599,7 @@ function calculate(){
   id("sumReservation").textContent="-"+peso(reservationDeduction); id("sumTax").textContent=peso(tax);
   id("grandTotal").textContent=peso(total);
   id("sumPaid").textContent=peso(paid); id("sumBalance").textContent=peso(balance);
-  return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,subtotalBeforeTax,tax,total,paid,balance};
+  return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,subtotalBeforeTax,tax,total,paid,balance,taxEnabled};
 }
 
 function syncPaymentStatusFromAmount(){
@@ -751,6 +767,7 @@ function editTransaction(no){
 
 function printReceipt(){
   const c=calculate(), d=c.d;
+  const taxEnabled = !!(id("taxEnabled") && id("taxEnabled").checked);
   const lines=[];
   d.services.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
   d.addons.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
@@ -759,20 +776,44 @@ function printReceipt(){
   d.packages.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)} (Package)</td><td>1</td><td>${peso(x.price)}</td></tr>`));
   d.fees.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
 
+  const itemLines = [];
+  [
+    ...d.services,
+    ...d.addons,
+    ...d.rhinestones,
+    ...d.removals,
+    ...d.packages
+  ].forEach((x) => {
+    let name = x.name || "Item";
+    if (x.type === 'rhinestone') name = `${name} (Rhinestone & Charms)`;
+    if (x.type === 'package') name = `${name} (Package)`;
+    itemLines.push(`<tr><td>${escapeHtml(name)}</td><td>${x.qty || 1}</td><td>${peso((x.price || 0) * (x.qty || 1))}</td></tr>`);
+  });
+
+  const additionalFeeLines = [];
+  d.fees.forEach(x => {
+    additionalFeeLines.push(`<tr class="fee-row"><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price * x.qty)}</td></tr>`);
+  });
+
   const receiptHtml = `<!DOCTYPE html>
   <html><head><title>${id("txNo").value}</title><meta charset="UTF-8"><style>
-    body{font-family:Arial;margin:35px;color:#3e3340;background:#fff}h1{text-align:center;font-family:Georgia}.center{text-align:center}
+    body{font-family:Arial;margin:35px;color:#3e3340;background:#fff}h1{font-family:Georgia;margin:0}.center{text-align:center}
     table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
     .total{font-size:20px;font-weight:bold}.pink{background:#fff0f7;padding:12px;border-radius:10px}
+    .receipt-brand{display:flex;align-items:center;justify-content:flex-start;gap:14px;text-align:left;margin-bottom:10px}
+    .receipt-logo{width:96px;height:96px;border-radius:20px;display:block;object-fit:cover;border:2px solid rgba(124,97,126,.18);background:#fff;flex-shrink:0}
+    .receipt-copy{text-align:left}
+    .fee-header{background:#fff3f9;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:10px;padding-bottom:10px;color:#6f5270}
+    .divider-line{height:1px;border-top:1px solid #d9c8d5;margin:12px 0}
     @media print { body { margin: 0; padding: 20px; } }
   </style></head><body>
-    <div class="center"><h1>Mingsha Luxe Nail Studio</h1><div>Olongapo | The Home of Soft Glam</div><div>Barretto, Olongapo City · 09318833614</div></div>
+    <div class="receipt-brand"><img class="receipt-logo" src="mingshalogo.jpg" alt="Mingsha Luxe logo"><div class="receipt-copy"><h1>Mingsha Luxe Nail Studio</h1><div>Olongapo | The Home of Soft Glam</div><div>Barretto, Olongapo City · 09318833614</div></div></div>
     <hr><h2 class="center">${id("txType").value}</h2>
     <div class="pink"><b>Receipt No:</b> ${id("txNo").value}<br><b>Client:</b> ${escapeHtml(id("clientName").value)}<br>
     <b>Date:</b> ${escapeHtml(id("txDate").value)}<br><b>Appointment:</b> ${escapeHtml(id("appointmentDate").value||"—")}</div>
-    <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${lines.join("")}</tbody></table>
-    <table><tr><td>Discount</td><td>${peso(c.discount)}</td></tr><tr><td>Reservation Deduction</td><td>${peso(c.reservationDeduction)}</td></tr>
-    <tr><td>Tax (8%)</td><td>${peso(c.tax)}</td></tr><tr class="total"><td>TOTAL</td><td>${peso(c.total)}</td></tr>
+    <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${itemLines.join("")}${d.fees.length ? `<tr class="fee-header"><td colspan="3"><strong>Additional Fees</strong></td></tr>${additionalFeeLines.join("")}` : ""}</tbody></table>
+    <div class="divider-line"></div>
+    <table><tr><td>Discount</td><td>${peso(c.discount)}</td></tr><tr><td>Reservation Deduction</td><td>${peso(c.reservationDeduction)}</td></tr>${taxEnabled ? `<tr><td>Tax (8%)</td><td>${peso(c.tax)}</td></tr>` : ""}<tr class="total"><td>TOTAL</td><td>${peso(c.total)}</td></tr>
     <tr><td>Amount Paid</td><td>${peso(c.paid)}</td></tr><tr class="total"><td>Balance</td><td>${peso(c.balance)}</td></tr></table>
     <p><b>Status:</b> ${id("paymentStatus").value} &nbsp; <b>Payment:</b> ${id("paymentMethod").value}</p>
     <p><b>Reservation Fee:</b> ${peso(c.reservation)} — deductible from nail service only.</p>
