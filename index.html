@@ -170,6 +170,7 @@
         <div><span>Additional Fees</span><b id="sumFees">₱0.00</b></div>
         <div><span>Discount</span><b id="sumDiscount">-₱0.00</b></div>
         <div><span>Reservation Deduction</span><b id="sumReservation">-₱0.00</b></div>
+        <div class="hidden"><span>Tax (8%)</span><b id="sumTax">₱0.00</b></div>
         <div class="grand"><span>TOTAL</span><b id="grandTotal">₱0.00</b></div>
         <div><span>Paid</span><b id="sumPaid">₱0.00</b></div>
         <div><span>Balance</span><b id="sumBalance">₱0.00</b></div>
@@ -371,6 +372,7 @@ let transactions = [];
 let firebaseDB = null;
 let firebaseAuth = null;
 let currentUser = null;
+let editingTransactionId = null;
 
 const peso = n => "₱" + Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
 const id = x => document.getElementById(x);
@@ -387,13 +389,70 @@ function showTab(tab){
   if(tab==="settings") renderPriceSettings();
 }
 
+function clearEditState(){
+  editingTransactionId = null;
+  id("txNo").readOnly = false;
+  id("txNo").value = makeNo();
+  id("txDate").value = nowLocal();
+}
+
 function newTransaction(){
-  id("txNo").value=makeNo(); id("txDate").value=nowLocal();
+  clearEditState();
   id("clientName").value=""; id("clientPhone").value=""; id("appointmentDate").value="";
   id("txType").value="Payment Receipt"; id("paymentMethod").value="Cash"; id("paymentStatus").value="PAID";
   id("reservationFee").value=0; id("discount").value=0; id("amountPaid").value=0; id("notes").value="";
   ["serviceRows","addonRows","removalRows","packageRows","feeRows"].forEach(x=>id(x).innerHTML="");
   addService(); calculate();
+}
+
+function loadTransactionIntoForm(tx){
+  editingTransactionId = tx.firebaseId || null;
+  id("txNo").readOnly = true;
+  id("txNo").value = tx.receiptNo || "";
+  id("txDate").value = tx.txDate || nowLocal();
+  id("clientName").value = tx.clientName || "";
+  id("clientPhone").value = tx.clientPhone || "";
+  id("appointmentDate").value = tx.appointmentDate || "";
+  id("txType").value = tx.txType || "Payment Receipt";
+  id("paymentMethod").value = tx.paymentMethod || "Cash";
+  id("paymentStatus").value = tx.paymentStatus || "PAID";
+  id("reservationFee").value = tx.reservationFee || 0;
+  id("discount").value = tx.discount || 0;
+  id("amountPaid").value = tx.amountPaid || 0;
+  id("notes").value = tx.notes || "";
+
+  ["serviceRows","addonRows","removalRows","packageRows","feeRows"].forEach(x=>id(x).innerHTML="");
+
+  (tx.services || []).forEach(s => addService(s.name, s.price));
+  (tx.services || []).forEach((s, idx) => {
+    const row = id("serviceRows").children[idx];
+    if(row){ row.querySelector(".serviceQty").value = s.qty || 1; }
+  });
+
+  (tx.addons || []).forEach(a => addAddonFromData(a, "addonRows"));
+  (tx.removals || []).forEach(r => addAddonFromData(r, "removalRows"));
+  (tx.packages || []).forEach(pkg => {
+    const row=document.createElement("div"); row.className="item-row";
+    row.innerHTML=`<input class="packageName" placeholder="Package name" value="${escapeHtml(pkg.name)}">
+      <input class="packageRegular" type="number" min="0" placeholder="Regular total" value="${pkg.regular || 0}" oninput="calculate()">
+      <input class="packagePrice" type="number" min="0" placeholder="Package price" value="${pkg.price || 0}" oninput="calculate()">
+      <button class="danger" onclick="this.parentElement.remove();calculate()">×</button>`;
+    id("packageRows").appendChild(row);
+  });
+  (tx.fees || []).forEach(f => addAddonFromData(f, "feeRows"));
+  calculate();
+  showTab("pos");
+}
+
+function addAddonFromData(item, container){
+  const row=document.createElement("div"); row.className="item-row";
+  const optionMarkup = (container === "addonRows" ? NAIL_ART_OPTIONS : container === "removalRows" ? REMOVAL_OPTIONS : FEE_OPTIONS)
+    .map(x=>`<option value="${escapeHtml(x.name)}" data-price="${x.price}" ${x.name===item.name ? 'selected' : ''}>${escapeHtml(x.name)}</option>`).join("");
+  row.innerHTML=`<select class="genericName" onchange="syncGenericPrice(this)"><option value="">Select item</option>${optionMarkup}</select>
+    <input class="genericQty" type="number" min="1" value="${item.qty || 1}" oninput="calculate()">
+    <input class="genericPrice" type="number" min="0" step=".01" value="${item.price || 0}" oninput="calculate()">
+    <button class="danger" onclick="this.parentElement.remove();calculate()">×</button>`;
+  id(container).appendChild(row);
 }
 
 function getServiceGroups(){
@@ -512,16 +571,28 @@ function calculate(){
   const discount=+id("discount").value||0;
   const reservation=+id("reservationFee").value||0;
   const reservationDeduction=Math.min(reservation,services);
-  const total=Math.max(0,services+addons+rhinestones+removal+packages+fees-discount-reservationDeduction);
+  const subtotalBeforeTax = Math.max(0, services + addons + rhinestones + removal + packages + fees - discount - reservationDeduction);
+  const tax = subtotalBeforeTax * 0.08;
+  const total = subtotalBeforeTax + tax;
   const paid=+id("amountPaid").value||0;
   const balance=Math.max(0,total-paid);
   id("reservationDeduction").value=reservationDeduction.toFixed(2);
   id("sumServices").textContent=peso(services); id("sumAddons").textContent=peso(addons+rhinestones);
   id("sumRemoval").textContent=peso(removal); id("sumPackages").textContent=peso(packages);
   id("sumFees").textContent=peso(fees); id("sumDiscount").textContent="-"+peso(discount);
-  id("sumReservation").textContent="-"+peso(reservationDeduction); id("grandTotal").textContent=peso(total);
+  id("sumReservation").textContent="-"+peso(reservationDeduction); id("sumTax").textContent=peso(tax);
+  id("grandTotal").textContent=peso(total);
   id("sumPaid").textContent=peso(paid); id("sumBalance").textContent=peso(balance);
-  return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,total,paid,balance};
+  return {d,services,addons,rhinestones,removal,packages,fees,discount,reservation,reservationDeduction,subtotalBeforeTax,tax,total,paid,balance};
+}
+
+function syncPaymentStatusFromAmount(){
+  const total = calculate().total;
+  const paid = Number(id("amountPaid").value || 0);
+  const currentStatus = id("paymentStatus").value;
+  if (paid >= total && total > 0 && currentStatus !== "PAID") {
+    id("paymentStatus").value = "PAID";
+  }
 }
 
 async function loginWithFirebase(){
@@ -574,8 +645,7 @@ async function saveTransaction(){
   const status=id("paymentStatus").value;
   const amountPaid=c.paid;
   if(!id("clientName").value.trim()){alert("Please enter the client name.");return;}
-  if(status==="PAID" && amountPaid < c.total){ alert("PAID transactions must have the full amount paid."); return; }
-  if(status!=="PAID" && amountPaid>c.total){ alert("Amount paid cannot exceed the total."); return; }
+  if(amountPaid > c.total){ alert("Amount paid cannot exceed the total."); return; }
 
   const tx={
     receiptNo:id("txNo").value, createdAt:new Date().toISOString(),
@@ -583,15 +653,21 @@ async function saveTransaction(){
     appointmentDate:id("appointmentDate").value, txType:id("txType").value,
     paymentMethod:id("paymentMethod").value, paymentStatus:status, notes:id("notes").value,
     reservationFee:c.reservation, reservationDeduction:c.reservationDeduction,
-    discount:c.discount, amountPaid:c.paid, total:c.total, balance:c.balance,
+    discount:c.discount, amountPaid:c.paid, subtotal:c.subtotalBeforeTax, tax:c.tax, total:c.total, balance:c.balance,
     services:c.d.services, addons:[...c.d.addons, ...c.d.rhinestones], removals:c.d.removals, packages:c.d.packages, fees:c.d.fees
   };
 
   if(firebaseDB){
     try{
-      const {collection,addDoc}=window.FirebaseAPI;
-      await addDoc(collection(firebaseDB,"transactions"),tx);
-      transactions.unshift(tx);
+      const {collection,addDoc,doc,setDoc}=window.FirebaseAPI;
+      if(editingTransactionId){
+        await setDoc(doc(firebaseDB,"transactions", editingTransactionId), tx);
+        const index = transactions.findIndex(t => (t.firebaseId || t.id) === editingTransactionId);
+        if(index >= 0){ transactions[index] = { ...tx, firebaseId: editingTransactionId }; }
+      } else {
+        const ref = await addDoc(collection(firebaseDB,"transactions"),tx);
+        transactions.unshift({ ...tx, firebaseId: ref.id });
+      }
       renderHistory();renderReport();
     }catch(e){
       console.error(e);
@@ -602,8 +678,8 @@ async function saveTransaction(){
     alert("Firebase is not connected.");
     return;
   }
-  alert("Transaction saved successfully.");
-  printReceipt();
+  alert(editingTransactionId ? "Transaction updated successfully." : "Transaction saved successfully.");
+  if(!editingTransactionId){ printReceipt(); }
   newTransaction();
 }
 
@@ -637,7 +713,7 @@ function renderHistory(){
   const status=id("historyStatus").value;
   const from=id("historyFrom").value, to=id("historyTo").value;
   let list=transactions.filter(t=>{
-    const match=!search || t.clientName.toLowerCase().includes(search)||t.receiptNo.toLowerCase().includes(search);
+    const match=!search || (t.clientName||"").toLowerCase().includes(search)||(t.receiptNo||"").toLowerCase().includes(search);
     const st=status==="ALL"||t.paymentStatus===status;
     const date=(t.txDate||"").slice(0,10);
     const fr=!from||date>=from, tr=!to||date<=to;
@@ -650,7 +726,7 @@ function renderHistory(){
     <td>${escapeHtml(t.receiptNo)}</td><td>${escapeHtml((t.txDate||"").replace("T"," "))}</td>
     <td>${escapeHtml(t.clientName)}</td><td>${peso(t.total)}</td><td>${peso(t.amountPaid)}</td><td>${peso(t.balance)}</td>
     <td><span class="badge ${t.paymentStatus.toLowerCase()}">${t.paymentStatus}</span></td>
-    <td><button onclick="viewTransaction('${t.receiptNo}')">View</button></td>
+    <td><div class="actions"><button onclick="viewTransaction('${t.receiptNo}')">View</button><button onclick="editTransaction('${t.receiptNo}')">Edit</button></div></td>
   </tr>`).join("")}</tbody></table>`;
 }
 
@@ -667,6 +743,12 @@ function viewTransaction(no){
   alert(`Receipt ${t.receiptNo}\nClient: ${t.clientName}\nTotal: ${peso(t.total)}\nPaid: ${peso(t.amountPaid)}\nBalance: ${peso(t.balance)}`);
 }
 
+function editTransaction(no){
+  const t=transactions.find(x=>x.receiptNo===no);if(!t)return;
+  loadTransactionIntoForm(t);
+  alert(`Editing transaction ${t.receiptNo}. Update the status or amounts and click Save Transaction.`);
+}
+
 function printReceipt(){
   const c=calculate(), d=c.d;
   const lines=[];
@@ -676,25 +758,43 @@ function printReceipt(){
   d.removals.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
   d.packages.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)} (Package)</td><td>1</td><td>${peso(x.price)}</td></tr>`));
   d.fees.forEach(x=>lines.push(`<tr><td>${escapeHtml(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`));
-  const win=window.open("","_blank","width=800,height=900");
-  win.document.write(`<html><head><title>${id("txNo").value}</title><style>
-  body{font-family:Arial;margin:35px;color:#3e3340}h1{text-align:center;font-family:Georgia}.center{text-align:center}
-  table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
-  .total{font-size:20px;font-weight:bold}.pink{background:#fff0f7;padding:12px;border-radius:10px}
+
+  const receiptHtml = `<!DOCTYPE html>
+  <html><head><title>${id("txNo").value}</title><meta charset="UTF-8"><style>
+    body{font-family:Arial;margin:35px;color:#3e3340;background:#fff}h1{text-align:center;font-family:Georgia}.center{text-align:center}
+    table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+    .total{font-size:20px;font-weight:bold}.pink{background:#fff0f7;padding:12px;border-radius:10px}
+    @media print { body { margin: 0; padding: 20px; } }
   </style></head><body>
-  <div class="center"><h1>Mingsha Luxe Nail Studio</h1><div>Olongapo | The Home of Soft Glam</div><div>Barretto, Olongapo City · 09318833614</div></div>
-  <hr><h2 class="center">${id("txType").value}</h2>
-  <div class="pink"><b>Receipt No:</b> ${id("txNo").value}<br><b>Client:</b> ${escapeHtml(id("clientName").value)}<br>
-  <b>Date:</b> ${escapeHtml(id("txDate").value)}<br><b>Appointment:</b> ${escapeHtml(id("appointmentDate").value||"—")}</div>
-  <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${lines.join("")}</tbody></table>
-  <table><tr><td>Discount</td><td>${peso(c.discount)}</td></tr><tr><td>Reservation Deduction</td><td>${peso(c.reservationDeduction)}</td></tr>
-  <tr class="total"><td>TOTAL</td><td>${peso(c.total)}</td></tr><tr><td>Amount Paid</td><td>${peso(c.paid)}</td></tr>
-  <tr class="total"><td>Balance</td><td>${peso(c.balance)}</td></tr></table>
-  <p><b>Status:</b> ${id("paymentStatus").value} &nbsp; <b>Payment:</b> ${id("paymentMethod").value}</p>
-  <p><b>Reservation Fee:</b> ${peso(c.reservation)} — deductible from nail service only.</p>
-  <p class="center">Thank you for choosing Mingsha Luxe Nail Studio, Mingsha Babe! ♡</p>
-  <script>window.onload=()=>window.print();<\/script></body></html>`);
-  win.document.close();
+    <div class="center"><h1>Mingsha Luxe Nail Studio</h1><div>Olongapo | The Home of Soft Glam</div><div>Barretto, Olongapo City · 09318833614</div></div>
+    <hr><h2 class="center">${id("txType").value}</h2>
+    <div class="pink"><b>Receipt No:</b> ${id("txNo").value}<br><b>Client:</b> ${escapeHtml(id("clientName").value)}<br>
+    <b>Date:</b> ${escapeHtml(id("txDate").value)}<br><b>Appointment:</b> ${escapeHtml(id("appointmentDate").value||"—")}</div>
+    <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${lines.join("")}</tbody></table>
+    <table><tr><td>Discount</td><td>${peso(c.discount)}</td></tr><tr><td>Reservation Deduction</td><td>${peso(c.reservationDeduction)}</td></tr>
+    <tr><td>Tax (8%)</td><td>${peso(c.tax)}</td></tr><tr class="total"><td>TOTAL</td><td>${peso(c.total)}</td></tr>
+    <tr><td>Amount Paid</td><td>${peso(c.paid)}</td></tr><tr class="total"><td>Balance</td><td>${peso(c.balance)}</td></tr></table>
+    <p><b>Status:</b> ${id("paymentStatus").value} &nbsp; <b>Payment:</b> ${id("paymentMethod").value}</p>
+    <p><b>Reservation Fee:</b> ${peso(c.reservation)} — deductible from nail service only.</p>
+    <p class="center">Thank you for choosing Mingsha Luxe Nail Studio, Mingsha Babe! ♡</p>
+  </body></html>`;
+
+  const oldBody = document.body.innerHTML;
+  document.body.innerHTML = receiptHtml;
+  document.body.style.margin = '0';
+  document.body.style.background = '#fff';
+
+  const restoreApp = () => {
+    document.body.innerHTML = oldBody;
+    document.body.style.margin = '';
+    document.body.style.background = '';
+    location.reload();
+  };
+
+  window.addEventListener('afterprint', restoreApp, { once: true });
+  setTimeout(() => {
+    window.print();
+  }, 200);
 }
 
 function renderPriceSettings(){
@@ -770,6 +870,18 @@ window.addEventListener("firebase-sdk-ready",()=>{
   id("firebaseConfig").value = JSON.stringify(defaultConfig, null, 2);
   connectFirebase();
 });
+
+id("amountPaid").addEventListener("input", () => {
+  syncPaymentStatusFromAmount();
+  calculate();
+});
+id("paymentStatus").addEventListener("change", () => {
+  if (id("paymentStatus").value === "PAID" && Number(id("amountPaid").value || 0) === 0) {
+    id("amountPaid").value = calculate().total;
+  }
+  calculate();
+});
+
 window.addEventListener("load",()=>{newTransaction();renderPriceSettings();});
 </script>
 </body>
